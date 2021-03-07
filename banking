@@ -1,0 +1,165 @@
+import random
+import sqlite3
+conn = sqlite3.connect('card.s3db')
+cur=conn.cursor()
+cur.execute('DROP TABLE IF EXISTS card;')
+conn.commit()
+cur.execute('''CREATE TABLE card( 
+    id INTEGER, 
+    number TEXT,
+    pin TEXT,
+    balance INTEGER DEFAULT 0
+);''')
+conn.commit()
+
+dict_={}
+card_holder={}
+ids = {}
+def inside(card_number, FLAG):
+    while True:
+        print("1. Balance")
+        print("2. Add Income")
+        print("3. Do Transfer")
+        print("4. Close Account")
+        print("5. Log out")
+        print("0. Exit")
+        inp = int(input())
+        if inp == 1:
+            print("Balance: {}".format(card_holder[card_number].balance))
+        elif inp == 5:
+            print("You have successfully logged out!\n")
+            break
+        elif inp == 2:
+            print('Enter income:')
+            temp = int(input())
+            card_holder[card_number].balance+=temp
+            x=card_holder[card_number].balance
+            ppp=ids[card_number]
+            cur.execute('''
+              UPDATE card
+              SET balance = :x
+              WHERE id = :ppp;
+             ''', {'x':x, 'ppp':ppp})
+            conn.commit()
+            print('Income was added!')
+        elif inp == 3:
+            print('Transfer\nEnter card number:')
+            temp= int(input())
+            temp_digits=[]
+            copy_of_temp=temp
+            copy_of_temp//=10
+            while copy_of_temp != 0:
+                temp_digits.append(copy_of_temp % 10)
+                copy_of_temp//=10
+            sum = 0
+            k = 1 #increment
+            for i in temp_digits:
+               if k%2 == 1:
+                 i *= 2
+               if i > 9:
+                 i -= 9
+               sum += i
+               k += 1
+            if (sum+temp%10)%10 != 0:
+                print('Probably you made a mistake in the card number. Please try again!')
+            elif temp not in card_holder:
+                print("Such a card does not exist.")
+            elif temp == card_number:
+                print("You cannot transfer to the same account!")
+            else:
+                print("Enter how much money you want to transfer:")
+                l = int(input())
+                if(l > card_holder[card_number].balance):
+                    print('Not enough money')
+                else:
+                    card_holder[card_number].balance-=l
+                    x = card_holder[card_number].balance
+                    card_holder[temp].balance+=l
+                    y=card_holder[temp].balance
+                    cur.execute('''DELETE FROM card WHERE number= :card_number''',{'card_number': card_number})
+                    conn.commit()
+                    cur.execute('''INSERT INTO card VALUES(?,?,?,?)''', (random.randint(0,9),card_number, dict_[card_number], x))
+                    conn.commit()
+
+                    cur.execute('DELETE FROM card WHERE number = :temp', {'temp':temp})
+                    conn.commit()
+                    cur.execute('INSERT INTO card VALUES(?,?,?,?)', (random.randint(0,9), temp, dict_[temp], y))
+                    conn.commit()
+        elif inp == 4:
+            dict_.pop(card_number)
+            card_holder.pop(card_number)
+            cur.execute('DELETE FROM card WHERE number =:card_number',{'card_number':card_number})
+            conn.commit()
+            print('The account has been closed!')
+        elif inp == 0:
+           print("Bye!")
+           FLAG[0]=0
+           break
+           
+           
+class BankingSystem:
+    def __init__ (self):
+        self.balance = 0
+
+
+# Write your code here
+
+
+
+#MAIN THING STARTS HERE
+while True:
+    print("1. Create an account")
+    print("2. Log into account")
+    print("0. Exit")
+    user_input = int(input())
+    print()
+    if user_input == 1:
+       x = 400000*pow(10, 9)+random.randint(100000, 999999)
+       digits = []
+       copy_of_x = x
+       while copy_of_x != 0:
+           digits.append(copy_of_x % 10)
+           copy_of_x //= 10
+       sum = 0
+       k = 1 #increment
+       for i in digits:
+           if k%2 == 1:
+               i *= 2
+           if i > 9:
+               i -= 9
+           sum += i
+           k += 1
+       checkdigit = 0
+       if(sum%10 > 0):
+           checkdigit = 10-sum % 10
+           
+       x = x*10
+       x += int(checkdigit)
+       y = random.randint(1000, 9999)
+       dict_[x] = y
+       unique_id = random.randint(1000,1000000)
+       ids[x]=unique_id
+       cur.execute('INSERT INTO card(id, number, pin, balance) VALUES(?,?,?,?)', (unique_id, x, y, 0))
+       conn.commit()
+       card_holder[x] = BankingSystem()
+       print("Your card has been created")
+       print('Your card number:\n{}'.format(x))
+       print('Your card pin:\n{}'.format(y))
+       print()
+    elif user_input == 2:
+        print("Enter your card number: ")
+        card_number = int(input())
+        print("Enter you PIN: ")
+        card_pin = int(input())
+        if card_number not in dict_ or dict_[card_number]!=card_pin:
+            print("Wrong card number or PIN!")
+        else:
+            print("You have successfully logged in!\n")
+            FLAG = []
+            FLAG.append(1)
+            inside(card_number, FLAG)
+            if FLAG[0] == 0:
+                break
+    elif user_input == 0:
+        print("Bye!")
+        break
